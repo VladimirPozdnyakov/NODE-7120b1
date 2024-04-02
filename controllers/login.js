@@ -1,4 +1,4 @@
-const {User} = require("../models/db");
+const { User } = require("../models/db");
 const jwt = require("jsonwebtoken");
 const logger = require("../logger/index_logger");
 const bcrypt = require("bcrypt");
@@ -21,29 +21,37 @@ async function authentificate(dataForm, cb) {
   }
 }
 
-exports.submit = (req, res, next) => {
-  authentificate(req.body.loginForm, (err, data) => {
-    if (err) return next(err);
-    if (!data) {
-      res.error("Имя или пароль неверный");
-      res.redirect("back"); //
-    } else {
-      req.session.userEmail = data.email;
-      req.session.userName = data.name;
-      // генерация токена
-      const jwt_time = process.env.jwtTime;
-      const token = jwt.sign({ name: data.email }, process.env.jwtToken, {
-        expiresIn: jwt_time,
-      });
-      res.cookie("jwt", token, {
-        httpOnly: true,
-        maxAge: jwt_time,
-      });
-
-      res.redirect("/");
-      logger.info("Token login " + " transferred successfully");
+exports.submit = async (req, res, next) => {
+  try {
+    const user = await User.findOne({
+      where: { email: req.body.loginForm.email },
+    });
+    if (!user) {
+      logger.info("Пользователь не найден");
+      return res.redirect("back");
     }
-  });
+    const result = await bcrypt.compare(
+      req.body.loginForm.password,
+      user.password
+    );
+
+    // генерация токена
+    const jwt_time = process.env.jwtTime;
+    const token = jwt.sign({ name: data.email }, process.env.jwtToken, {
+      expiresIn: jwt_time,
+    });
+    res.cookie("jwt", token, {
+      httpOnly: true,
+      maxAge: jwt_time,
+    });
+
+    logger.info("");
+
+    res.redirect("/");
+    logger.info("Token login " + " transferred successfully");
+  } catch (err) {
+    next(err);
+  }
 };
 
 exports.logout = function (req, res, next) {
